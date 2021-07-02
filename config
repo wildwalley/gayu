@@ -1,0 +1,95 @@
+'This is a script that makes a list of components used by Forms in Documaker
+'
+'To run this set the values for these near the bottom of the script
+'extractloc = "c:\users\RSURIYAN\desktop\extract"
+'    You will need to extract the contents of the entire Documaker library 
+'    you want to analyze into one directory.  List that directory in extractloc
+'    There is an extract that comes out of the migration process to series C.  It is
+'    located at \\TPC40cw2\d-read\docudata\claim\MRL_Migration\extract.  Copy this to your 
+'    local machine for performance reasons!
+'forFileName = "formlist.txt"
+'    You will need a list of all the .FOR files for the templates for a version.  
+'    List these one per line in this file.  for example C25324.FOR.
+'    This should be built from a list generated from Infopath, or from a Bill of Materials
+'    for the version.
+'
+'Then execute this script with the following command line:
+'wscript.exe makeCompList.vbs
+'The output is at vbscriptout
+
+
+public sub PSLtoPAR (outFL, pslFileName, extractloc, csvSeperator)
+	set pslFileObj = fso.getfile(extractloc & "\" & pslFileName)
+	set pslFileTS = pslFileObj.openastextstream(1)
+	do while pslFileTS.atendofstream <> True
+		pslTextline = pslFileTS.readline
+		if instr(1,pslTextline,"<SECTION NAME=",1) > 0 then
+			strpos = instr(1,pslTextline,"""",1) + 1
+			endpos = instr(strpos + 1,pslTextline,"""",1)
+			parFileName = mid(pslTextline,strpos , endpos - strpos) & ".PAR"
+			outFL.writeline currentForm & csvSeperator & csvSeperator & csvSeperator & parFileName
+		end if
+	loop
+end sub
+
+public sub FAPtoPSL (outFL, fapFileName, extractloc, csvSeperator)
+	set fapFileObj = fso.getfile(extractloc & "\" & fapFileName)
+	set fapFileTS = fapFileObj.openastextstream(1)
+	do while fapFileTS.atendofstream <> True
+		fapTextline = fapFileTS.readline
+		if instr(1,fapTextline,"A,FA01",1) > 0 then
+			strpos = instr(1,fapTextline,"""",1) + 1
+			endpos = instr(strpos + 1,fapTextline,"""",1)
+			pslFileName = mid(fapTextline,strpos , endpos - strpos) & ".PSL"
+			outFL.writeline currentForm & csvSeperator & csvSeperator & pslFileName
+			PSLtoPAR outFL, pslFileName, extractloc, csvSeperator
+		end if
+	loop
+end sub
+
+public sub FORtoFAP (outFL, forFileName, extractloc, csvSeperator)
+	on error resume next
+	set afileobj = fso.getfile(extractloc & "\" & forFileName)
+	if Err.number <> 0 then
+		outFL.writeline "FORM NOT FOUND " & extractloc & "\" & forFileName
+		Err.clear
+		exit sub
+	end if
+	set ts = afileobj.openastextstream(1)
+	do while ts.atendofstream <> True
+		textline = ts.readline
+		if instr(1,textline,"<SECTION NAME",1) > 0 then
+			strpos = instr(1,textline,"=",1) + 2
+			endpos = instr(strpos + 1,textline,"""",1)
+			fapFileName = mid(textline,strpos , endpos - strpos) & ".FAP"
+			outFL.writeline currentForm & csvSeperator & fapFileName
+			FAPtoPSL outFL, fapFileName, extractloc, csvSeperator
+		end if
+	loop
+end sub
+
+'These define the setup of the files for this script
+csvSeperator = ","
+'csvSeperator = ""
+extractloc = "C:\Users\RSURIYAN\Desktop\EOR EOB"
+forFileName = "formlist.txt"
+
+set FSO = Createobject("Scripting.FileSystemObject")
+set dtFolder= FSO.getfolder("c:\users\RSURIYAN\desktop")
+set outfile = dtFolder.createtextfile("mayvbscriptout.txt")
+set AFOLDER = FSO.GetFolder(extractloc)
+set FILECOL = AFOLDER.files
+forFileName = "formlist.txt"
+
+'Read list of forms
+
+set forfileobj = fso.getfile(extractloc & "\" & forFileName)
+set tsForm = forfileobj.openastextstream(1)
+formcount = 0
+do while tsForm.atendofstream <> True
+	currentForm = tsForm.readline
+	outfile.writeline currentForm
+	formcount = formcount + 1
+	FORtoFAP outfile, currentForm, extractloc, csvSeperator
+loop
+outfile.writeline "FORM COUNT = " & formcount
