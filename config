@@ -93,3 +93,6 @@ do while tsForm.atendofstream <> True
 	FORtoFAP outfile, currentForm, extractloc, csvSeperator
 loop
 outfile.writeline "FORM COUNT = " & formcount
+
+
+ftype VBSFile="%%SystemRoot%%\System32\WScript.exe" "%%1" %%*
